@@ -25,7 +25,7 @@ def highpass_filter(signal, highcut, sr, order=12):
 
 def onset_in_call(onset, calls_list, buffer=0):
     for index, call in calls_list.iterrows():
-        if call['Time Start'] - buffer >= onset >= call['Time End'] + buffer:
+        if call['Time Start'] - buffer <= onset <= call['Time End'] + buffer:
             return call['Species']
     else:
         return None
@@ -68,17 +68,15 @@ def get_chunks(onsets, max_duration_s):
 
 
 def chop_wave(config, labels, wave_path):
-    print(wave_path)
     sr, signal = wavfile.read(wave_path)
     signal_norm = signal.astype('float32') / config['Signal']['scaling_factor']
     signal_filtered = highpass_filter(signal_norm, config['Signal']['highpass_cut'], sr)
     onsets = get_onsets(signal_filtered, sr, config)
     chunks_s = get_chunks(onsets, config['Signal']['max_duration_s'])
     filename_noext = os.path.splitext(os.path.basename(wave_path))[0]
+    dirname = os.path.join(config['Data']['rootdir'], config['Data']['outdir'])
+
     for start, end in chunks_s[1:]:
-
-        dirname = os.path.join(config['Data']['rootdir'], config['Data']['outdir'])
-
         call = onset_in_call(start, labels[filename_noext], buffer=0) if labels else None
         if call:
             chunk_name = '{}_{:07.3f}_{:07.3f}_{}.wav'.format(filename_noext, start, end, call)
@@ -106,7 +104,7 @@ def main():
     pool.map(chop_wrapper, glob.glob(datadir + '*.wav'))
     pool.close()
     pool.join()
-
+    #
     # for wave_path in glob.glob(datadir + '*.wav'):
     #     chop_wave(config, labels, wave_path)
 
