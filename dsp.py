@@ -31,7 +31,7 @@ def onset_in_call(onset, calls_list, buffer=0):
         return None
 
 
-def get_onsets(signal, sr, params, unit='s'):
+def get_onsets_config(signal, sr, params):
    return get_onsets(signal=signal,
                sr=sr,
                nfft=params['Signal']['win'],
@@ -39,8 +39,7 @@ def get_onsets(signal, sr, params, unit='s'):
                onset_detector_type=params['OnsetDetector']['type'],
                onset_threshold=params['OnsetDetector']['threshold'],
                onset_silence_threshold=params['OnsetDetector']['silence_threshold'],
-               min_duration_s=params['Signal']['min_duration_s'],
-               unit=unit)
+               min_duration_s=params['Signal']['min_duration_s'])
 
 
 def get_onsets(signal, sr, nfft, hop, onset_detector_type, onset_threshold=None,
@@ -69,7 +68,7 @@ def get_onsets(signal, sr, nfft, hop, onset_detector_type, onset_threshold=None,
 
     return onsets[1:]
 
-def get_slices(signal, sr, params):
+def get_slices_config(signal, sr, params):
     return get_slices(signal=signal,
                sr=sr,
                nfft=params['Signal']['win'],
@@ -127,8 +126,9 @@ def get_chunks(onsets, max_duration_s):
 def chop_wave(config, labels, wave_path):
     sr, signal = wavfile.read(wave_path)
     signal_norm = signal.astype('float32') / config['Signal']['scaling_factor']
-    signal_filtered = highpass_filter(signal_norm, config['Signal']['highpass_cut'], sr)
-    onsets = get_onsets(signal_filtered, sr, config)
+    signal_filtered = highpass_filter(signal_norm, sr=sr, highcut=config['Signal']['highpass_cut'])
+    onsets = get_onsets_config(signal_filtered, sr, config)
+    # get_slices_config(signal_filtered, sr=sr, params=config)
     chunks_s = get_chunks(onsets, config['Signal']['max_duration_s'])
     filename_noext = os.path.splitext(os.path.basename(wave_path))[0]
     dirname = os.path.join(config['Data']['rootdir'], config['Data']['outdir'])
@@ -154,15 +154,15 @@ def main():
     datadir = os.path.join(config['Data']['rootdir'], config['Data']['waves'])
     labels = read_labels(os.path.join(config['Data']['rootdir'], config['Data']['labels_xls'])) if 'labels_xls' in config['Data'] else None
 
-    chop_wrapper = partial(chop_wave, config, labels)
-
-    pool = multiprocessing.Pool()
-    pool.map(chop_wrapper, glob.glob(datadir + '*.wav'))
-    pool.close()
-    pool.join()
+    # chop_wrapper = partial(chop_wave, config, labels)
     #
-    # for wave_path in glob.glob(datadir + '*.wav'):
-    #     chop_wave(config, labels, wave_path)
+    # pool = multiprocessing.Pool()
+    # pool.map(chop_wrapper, glob.glob(datadir + '*.wav'))
+    # pool.close()
+    # pool.join()
+
+    for wave_path in glob.glob(datadir + '*.wav'):
+        chop_wave(config, labels, wave_path)
 
 
 
