@@ -2,7 +2,7 @@ import os
 import numpy as np
 import glob
 import configobj
-import multiprocessing
+import aubio
 from validate import Validator
 from scipy.io import wavfile
 from aubio import onset
@@ -10,17 +10,60 @@ from scipy.signal import butter, lfilter
 from read_labels import read_labels
 from functools import partial
 
+def _find_pitches(win, pitch_o, tolerance):
+    pitches = []
+    for frame_idx, frame in enumerate(win[:-1]):
+        pitch = pitch_o(frame)[0]
+        confidence = pitch_o.get_confidence()
+        if confidence > tolerance:
+            pitches.append((frame_idx, pitch))
+    return pitches
 
-def butter_highpass(highcut, fs, order=12):
+
+def get_pitch(signal, sr, block_size, hop, tolerance = 0.7, unit = 'seconds'):
+    pitch_o = aubio.pitch("yin", block_size, hop, sr)
+    pitch_o.set_unit('Hz')
+    pitch_o.set_tolerance(tolerance)
+    signal = signal.astype('float32')
+    signal_win = np.array_split(signal, np.arange(hop, len(signal), hop))
+
+    pitches = _find_pitches(signal_win, pitch_o, tolerance)
+
+    if unit == 'seconds':
+        pitches = [(frame_idx * hop / sr, value) for frame_idx, value in pitches]
+    elif unit == 'samples':
+        pitches = [(frame_idx * hop, value) for frame_idx, value in pitches]
+    else:
+        raise NotImplemented('Unit %s is not implemented', unit)
+
+    if not pitches:
+        raise ValueError('No pitches!')
+
+    return pitches
+
+
+def _butter_highpass(highcut, fs, order=6):
     nyq = 0.5 * fs
     high = highcut / nyq
     b, a = butter(order, high, btype='highpass')
     return b, a
 
+def _butter_lowpass(lowcut, fs, order=6):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    b, a = butter(order, low, btype='lowpass')
+    return b, a
+
+
+def lowpass_filter(signal, sr, lowcut, order=12):
+    b, a = _butter_lowpass(lowcut, sr, order)
+    return lfilter(b, a, signal).astype('float32')
+
 
 def highpass_filter(signal, sr, highcut, order=12):
-    b, a = butter_highpass(highcut, sr, order)
+    b, a = _butter_highpass(highcut, sr, order)
     return lfilter(b, a, signal).astype('float32')
+
 
 
 def onset_in_call(onset, calls_list, buffer=0):
