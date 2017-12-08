@@ -111,9 +111,10 @@ def get_onsets(signal, sr, nfft, hop, onset_detector_type, onset_threshold=None,
 
     return onsets[1:]
 
-def get_slices_config(signal, sr, params):
+def get_slices_config(signal, sr, method, params):
     return get_slices(signal=signal,
                sr=sr,
+               method=method,
                nfft=params['Signal']['win'],
                hop=params['Signal']['win'] // params['Signal']['hop_factor'],
                onset_detector_type=params['OnsetDetector']['type'],
@@ -122,8 +123,8 @@ def get_slices_config(signal, sr, params):
                min_duration_s=params['Signal']['min_duration_s'],
                unit='s')
 
-def get_slices(signal, sr, nfft, hop, onset_detector_type, onset_threshold=None, onset_silence_threshold=None,
-               min_duration_s=None, max_duration_s=None, method='fixed', unit='s'):
+def get_slices(signal, sr, method='fixed', nfft=512, hop=256, onset_detector_type='hfc', onset_threshold=None, onset_silence_threshold=None,
+               min_duration_s=None, max_duration_s=None, unit='s'):
     slices = []
 
     onsets_fw = np.array(get_onsets(signal, sr, nfft, hop, onset_detector_type, onset_threshold,
@@ -132,7 +133,7 @@ def get_slices(signal, sr, nfft, hop, onset_detector_type, onset_threshold=None,
     if method == 'dynamic':
         onsets_bw = np.array(get_onsets(signal[::-1], sr, nfft, hop, onset_detector_type, onset_threshold,
                                              onset_silence_threshold, min_duration_s, unit))
-        onsets_bw_reversed = (len(signal) - onsets_bw)[::-1]
+        onsets_bw_reversed = (len(signal)/sr - onsets_bw)[::-1]
 
 
         for onset_fw in onsets_fw:
@@ -170,9 +171,10 @@ def chop_wave(config, labels, wave_path):
     sr, signal = wavfile.read(wave_path)
     signal_norm = signal.astype('float32') / config['Signal']['scaling_factor']
     signal_filtered = highpass_filter(signal_norm, sr=sr, highcut=config['Signal']['highpass_cut'])
-    onsets = get_onsets_config(signal_filtered, sr, config)
+    # onsets = get_onsets_config(signal_filtered, sr, config)
     # get_slices_config(signal_filtered, sr=sr, params=config)
-    chunks_s = get_chunks(onsets, config['Signal']['max_duration_s'])
+    # chunks_s = get_chunks(onsets, config['Signal']['max_duration_s'])
+    chunks_s = get_slices_config(signal_filtered, sr, method='dynamic', params=config)
     filename_noext = os.path.splitext(os.path.basename(wave_path))[0]
     dirname = os.path.join(config['Data']['rootdir'], config['Data']['outdir'])
 
