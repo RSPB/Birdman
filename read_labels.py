@@ -11,7 +11,7 @@ def _time_to_total_seconds_converter(val):
     return total_seconds
 
 
-def read_labels(path):
-    sheets = pd.read_excel(path, sheetname=None, converters={'Time Start': _time_to_total_seconds_converter,
+def read_labels(path, sheetname=None):
+    sheets = pd.read_excel(path, sheet_name=sheetname, converters={'Time Start': _time_to_total_seconds_converter,
                                                              'Time End': _time_to_total_seconds_converter})
     return sheets
